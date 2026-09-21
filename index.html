@@ -1,5 +1,8 @@
 <!doctype html>
-<html lang="en">
+<!-- data-theme="light" pins the page to the white palette for everyone, so it
+     looks the same on a laptop set to dark, on a projector, and in a
+     screenshot pasted into an email. Remove it to follow each device again. -->
+<html lang="en" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -18,7 +21,10 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,800;1,9..144,600&family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 
 <style>
+/* Light, always — this also keeps date pickers, dropdowns and scrollbars
+   light on a machine whose OS is set to dark. */
 :root{
+  color-scheme:light;
   --ink:#241B2E;
   --ink-2:#584D66;
   --ink-3:#8A7F97;
