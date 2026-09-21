@@ -1,90 +1,74 @@
 rules_version = '2';
 
-/* Birthday Celebration — Firestore security rules.  OPEN MODE.
+/* Birthday Celebration — Firestore security rules.  NO SIGN-IN.
  *
- * Nobody is asked to sign in. Everyone who opens the page is signed in
- * silently and anonymously, which is what makes "you may edit your own order
- * and nobody else's" enforceable. The organiser signs in properly, by the
- * small link in the corner, to reach the claim and the settings.
+ * Nobody is ever asked to sign in — not the team, not the organiser.
+ * Everyone who opens the page is signed in silently and anonymously, purely
+ * so Firestore has someone to talk to; it carries no identity and grants no
+ * special standing.
  *
- * WHAT THIS ACCEPTS: anyone with the URL can see the orders, the wishes and
- * the roster. That was a deliberate choice — no sign-in friction for staff.
+ * WHAT THIS MEANS, PLAINLY: with no sign-in there is nothing that tells the
+ * organiser apart from anyone else, so anyone who has the URL can read and
+ * change everything here — the orders, the wishes, the roster, the menu, the
+ * budget and the expense claim. The link IS the password. Share it with the
+ * department, not on anything public.
  *
- * WHAT IT STILL STOPS: a passer-by cannot delete anyone's order, cannot edit
- * someone else's, cannot touch the menu, the roster or the budget, and cannot
- * see the expense claim at all. The worst they can do is add junk you delete.
+ * WHAT IT STILL STOPS: the wider internet without the link, and anything
+ * outside the collections named below — the catch-all at the bottom closes
+ * the rest of the database.
+ *
+ * TO LOCK IT DOWN LATER: set authProvider back to "email" in app/config.js
+ * and restore the organiser() checks (git history has the earlier version).
+ * The organiser then signs in by a one-click emailed link, and the settings,
+ * roster and claim go back to being theirs alone.
  *
  * Deploy:  Firestore Database -> Rules -> paste -> Publish
  * Requires: Authentication -> Sign-in method -> Anonymous  ENABLED
- *           Authentication -> Sign-in method -> Email link ENABLED (organiser)
  */
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Anyone who has the page open. Includes silent anonymous visitors.
+    // Anyone with the page open. Everyone is a silent anonymous visitor.
     function visitor() {
       return request.auth != null;
     }
 
-    // A real, named sign-in on the work domain — the person running it.
-    function organiser() {
-      return request.auth != null
-        && request.auth.token.firebase.sign_in_provider != 'anonymous'
-        && request.auth.token.email != null
-        && request.auth.token.email.lower() in [
-             'wangseng@crestar.com.sg'
-           ];
-    }
-
     // ---- menu, budget, brands, cost centres ---------------------------
     match /config/{doc} {
-      allow read:  if visitor();
-      allow write: if organiser();
+      allow read, write: if visitor();
     }
 
     // ---- who has a birthday when --------------------------------------
     match /roster/{id} {
-      allow read:  if visitor();
-      allow write: if organiser();
+      allow read, write: if visitor();
     }
 
     // ---- each month's celebration -------------------------------------
-    // The date, venue, vendor, delivery fee and spend. Organiser's to set.
+    // The date, venue, vendor, delivery fee and spend.
     match /events/{month} {
-      allow read:  if visitor();
-      allow write: if organiser();
+      allow read, write: if visitor();
 
-      // Orders. Each document is keyed on the person's own uid, so the rule
-      // "it must be yours" is simply "the id must equal your uid".
+      // Orders — one document per person.
       match /rsvps/{id} {
-        allow read:   if visitor();
-        allow create: if visitor() && id == request.auth.uid;
-        allow update: if organiser() || (visitor() && id == request.auth.uid);
-        allow delete: if organiser() || (visitor() && id == request.auth.uid);
+        allow read, write: if visitor();
       }
 
-      // Wishes. Anyone may pin one and anyone may react to one; only the
-      // author or the organiser can take one down.
+      // Wishes on the wall.
       match /wishes/{id} {
-        allow read:   if visitor();
-        allow create: if visitor();
-        allow update: if visitor();
-        allow delete: if organiser()
-                      || (resource.data.fromId != null
-                          && resource.data.fromId == request.auth.uid);
+        allow read, write: if visitor();
       }
     }
 
     // ---- the expense claim --------------------------------------------
-    // Money, receipts, the Yeeflow fields. Organiser only, both directions.
+    // Receipt figures and the Yeeflow fields. No money moves from here, but
+    // it is the most sensitive thing on the page — see the note at the top.
     match /claims/{month} {
-      allow read, write: if organiser();
+      allow read, write: if visitor();
     }
 
     // ---- display names -------------------------------------------------
     match /profiles/{uid} {
-      allow read:  if visitor();
-      allow write: if visitor() && uid == request.auth.uid;
+      allow read, write: if visitor();
     }
 
     // Anything not named above is closed.
