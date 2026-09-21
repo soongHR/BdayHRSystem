@@ -1,0 +1,87 @@
+rules_version = '2';
+
+/* Birthday Celebration — Firestore security rules.
+ *
+ * THIS FILE IS THE SECURITY. The Firebase config in app/config.js is public
+ * and protects nothing. Everything that keeps staff names, birthdays and
+ * dietary notes private is written here.
+ *
+ * Deploy:  firebase deploy --only firestore:rules
+ * Never leave the console's "test mode" rules in place — they allow the
+ * whole internet to read this, and they expire after 30 days and lock
+ * everyone out.
+ */
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- who counts as one of us -------------------------------------
+    function signedIn() {
+      return request.auth != null;
+    }
+    function work() {
+      return signedIn()
+        && request.auth.token.email != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.matches('(?i)^[^@]+@crestar\\.com\\.sg$');
+    }
+    // Organisers may clear a month, edit the roster and change settings.
+    function organiser() {
+      return work() && request.auth.token.email.lower() in [
+        'wangseng@crestar.com.sg'
+      ];
+    }
+
+    // ---- the menu, budget, brands, cost centres -----------------------
+    match /config/{doc} {
+      allow read:  if work();
+      allow write: if organiser();
+    }
+
+    // ---- who has a birthday when --------------------------------------
+    match /roster/{id} {
+      allow read:  if work();
+      allow write: if organiser();
+    }
+
+    // ---- each month's celebration -------------------------------------
+    match /events/{month} {
+      allow read:   if work();
+      allow create, update: if work();      // the page stamps spend/headcount
+      allow delete: if organiser();
+
+      // Orders. You may write your own; organisers may tidy any.
+      match /rsvps/{id} {
+        allow read: if work();
+        allow create, update: if work() && (id == request.auth.uid || organiser());
+        allow delete: if organiser() || id == request.auth.uid;
+      }
+
+      // Wishes. Anyone may pin one; only the author or an organiser removes it.
+      // Reactions live on the wish, so anyone may update that one field.
+      match /wishes/{id} {
+        allow read:   if work();
+        allow create: if work();
+        allow update: if work();
+        allow delete: if organiser()
+                      || (resource.data.fromId != null && resource.data.fromId == request.auth.uid);
+      }
+    }
+
+    // ---- the expense claim --------------------------------------------
+    // Money. Organisers only, both ways.
+    match /claims/{month} {
+      allow read, write: if organiser();
+    }
+
+    // ---- display names, so orders can show who placed them -------------
+    match /profiles/{uid} {
+      allow read:  if work();
+      allow write: if work() && uid == request.auth.uid;
+    }
+
+    // Anything not named above is closed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
