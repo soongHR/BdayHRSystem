@@ -91,6 +91,31 @@
       }
     }
 
+    /* Starting the organiser sign-in is wanted in two places — the corner
+       button and the notice inside Set up — so it lives on window and both
+       call the same thing. */
+    function startOrganiserSignIn() {
+      var addr = prompt("Organiser sign-in\n\nYour work email — a one-click link will be sent to it:",
+                        (cfg.organisers && cfg.organisers[0]) || "");
+      if (!addr) return;
+      addr = addr.trim();
+      if (!domainOk(addr)) { alert("Use your " + cfg.allowedEmailDomain + " address."); return; }
+      authMod.sendSignInLinkToEmail(auth, addr, {
+        url: location.href.split("?")[0].split("#")[0],
+        handleCodeInApp: true
+      }).then(function () {
+        try { localStorage.setItem("bdayEmailForSignIn", addr); } catch (e) {}
+        alert("Link sent to " + addr + ".\n\nOpen it in THIS browser on THIS device — that's what signs you in." +
+              "\nIt can take a minute, and it often lands in Junk or Clutter the first time.");
+      }).catch(function (err) {
+        var c = (err && err.code) || "unknown error";
+        alert("Couldn't send it: " + c +
+              (/unauthorized-continue-uri|invalid-continue-uri/.test(c)
+                ? "\n\nThis site's address isn't on Firebase's authorised list yet." : ""));
+      });
+    }
+    window.__bdayOrganiserSignIn = startOrganiserSignIn;
+
     /* A quiet corner link, only of interest to whoever runs the celebration. */
     function organiserLink() {
       function add() {
@@ -106,18 +131,7 @@
             if (confirm("Sign out of the organiser account?")) authMod.signOut(auth).then(function () { location.reload(); });
             return;
           }
-          var addr = prompt("Organiser sign-in\n\nYour work email — a one-click link will be sent to it:", "");
-          if (!addr) return;
-          if (!domainOk(addr)) { alert("Use your " + cfg.allowedEmailDomain + " address."); return; }
-          authMod.sendSignInLinkToEmail(auth, addr.trim(), {
-            url: location.href.split("?")[0].split("#")[0],
-            handleCodeInApp: true
-          }).then(function () {
-            try { localStorage.setItem("bdayEmailForSignIn", addr.trim()); } catch (e) {}
-            alert("Link sent to " + addr.trim() + ".\nOpen it on this device and you'll come back as the organiser.");
-          }).catch(function (err) {
-            alert("Couldn't send it: " + (err && err.code ? err.code : "unknown error"));
-          });
+          startOrganiserSignIn();
         };
         document.body.appendChild(a);
       }
