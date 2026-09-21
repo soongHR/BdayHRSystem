@@ -68,10 +68,9 @@
     });
 
     if (mode === "open") {
-      /* Nobody is asked for anything. Everyone gets a silent anonymous
-         account, which is what lets the rules say "you may edit your own
-         order and nobody else's". The organiser signs in properly, by a
-         small link in the corner, to unlock the claim and the settings. */
+      /* Nobody is asked for anything — not the team, not the organiser.
+         Everyone gets a silent anonymous account purely so Firestore has
+         someone to talk to; it carries no identity. */
       if (!user) {
         try {
           user = (await authMod.signInAnonymously(auth)).user;
@@ -80,7 +79,8 @@
           return null;
         }
       }
-      organiserLink();
+      /* No sign-in at all, by choice: no corner link, and everyone who
+         opens the page gets the organiser tools. The rules match this. */
     } else {
       if (!user) { showSignIn(); return null; }
       if (!domainOk(user.email)) {
@@ -114,7 +114,7 @@
                 ? "\n\nThis site's address isn't on Firebase's authorised list yet." : ""));
       });
     }
-    window.__bdayOrganiserSignIn = startOrganiserSignIn;
+    if (mode !== "open") window.__bdayOrganiserSignIn = startOrganiserSignIn;
 
     /* A quiet corner link, only of interest to whoever runs the celebration. */
     function organiserLink() {
@@ -274,8 +274,8 @@
     }
 
     var admins = (cfg.organisers || []).map(function (e) { return String(e).toLowerCase(); });
-    var isAdmin = !user.isAnonymous
-      && (!admins.length || admins.indexOf(String(user.email || "").toLowerCase()) >= 0);
+    var isAdmin = (mode === "open") ? true
+      : (!user.isAnonymous && (!admins.length || admins.indexOf(String(user.email || "").toLowerCase()) >= 0));
 
     var profileCache = {};
     var userApi = {
